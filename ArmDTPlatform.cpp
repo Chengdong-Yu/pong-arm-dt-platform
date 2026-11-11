@@ -60,24 +60,24 @@ private:
 
 OSDefineMetaClassAndStructors (ArmDTPlatform, IODTPlatformExpert)
 
-// Boot-epoch clock, backed by a supplied host/firmware UTC sample
-// and the real arch timer. This is a software clock, not a claimed PMIC RTC.
+// Firmware supplies a UTC sample; XNU supplies elapsed monotonic time.
+// There is no hardware RTC claim or separately maintained periodic clock.
 long ArmDTPlatform::getGMTTimeOfDay (void)
 {
   long offset = __atomic_load_n (&fCalendarOffset, __ATOMIC_ACQUIRE);
   if (offset == 0) return 0;
-  clock_sec_t uptime;
-  clock_usec_t microseconds;
-  clock_get_system_microtime (&uptime, &microseconds);
-  return offset + (long) uptime;
+  uint64_t ticks, nanoseconds;
+  clock_get_uptime (&ticks);
+  absolutetime_to_nanoseconds (ticks, &nanoseconds);
+  return offset + (long) (nanoseconds / NSEC_PER_SEC);
 }
 
 void ArmDTPlatform::setGMTTimeOfDay (long seconds)
 {
-  clock_sec_t uptime;
-  clock_usec_t microseconds;
-  clock_get_system_microtime (&uptime, &microseconds);
-  __atomic_store_n (&fCalendarOffset, seconds - (long) uptime, __ATOMIC_RELEASE);
+  uint64_t ticks, nanoseconds;
+  clock_get_uptime (&ticks);
+  absolutetime_to_nanoseconds (ticks, &nanoseconds);
+  __atomic_store_n (&fCalendarOffset, seconds - (long) (nanoseconds / NSEC_PER_SEC), __ATOMIC_RELEASE);
 }
 
 // Serialized empty name lists: XNU's processTopLevel() treats a null pointer
